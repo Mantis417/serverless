@@ -30,6 +30,10 @@ Parameters:
     Default: "mantis417/serverless"
     Description: "GitHub repository"
 
+  GitHubConnectionArn:
+    Type: String
+    Default: "arn:aws:codeconnections:eu-west-1:571600846761:connection/c697f9ec-d323-4728-840e-c7ea7a55a351"
+    Description: "Hardcoded GitHub Connection ARN - Not recommended."
 Resources:
   # DynamoDB Table
   DynamoDBTable:
@@ -633,13 +637,6 @@ Resources:
     Properties:
       BucketName: !Sub 'artifact-bucket-${AWS::AccountId}-${AWS::Region}-${AWS::StackName}'
 
-  #GitHub Connection
-  GitHubConnection:
-    Type: AWS::CodeStarConnections::Connection
-    Properties:
-      ConnectionName: GitHubConnection
-      ProviderType: GitHub
-
   #IAM Role for CodePipeline
   CodePipelineRole:
     Type: AWS::IAM::Role
@@ -670,7 +667,7 @@ Resources:
                   - !GetAtt ArtifactBucket.Arn
                   - !Sub "${ArtifactBucket.Arn}/*"
                   - !Sub "${ContactS3Bucket.Arn}/*"
-                  - !Ref GitHubConnection
+                  - !Ref GitHubConnectionArn
 
               - Effect: Allow
                 Action:
@@ -695,7 +692,6 @@ Resources:
     DependsOn:
       - CodePipelineRole
       - ArtifactBucket
-      - GitHubConnection
       - ContactS3Bucket
     Properties:
       Name: MyPipeline
@@ -718,7 +714,7 @@ Resources:
               OutputArtifacts:
                 - Name: SourceOutput
               Configuration:
-                ConnectionArn: !Ref GitHubConnection
+                ConnectionArn: !Ref GitHubConnectionArn
                 FullRepositoryId: !Ref GitHubRepository
                 BranchName: main
 
