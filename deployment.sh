@@ -2,7 +2,7 @@
 
 # Set variables for the template file and stack name
 TEMPLATE_FILE="cloudform.yml"  # Change this to the path of your CloudFormation template file
-STACK_NAME="serverless"  # Change this to your stack name
+STACK_NAME="serverless1"  # Change this to your stack name
 
 # Deploy the CloudFormation stack using the variables from .env
 aws cloudformation deploy \

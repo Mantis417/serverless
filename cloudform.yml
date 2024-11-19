@@ -34,6 +34,7 @@ Parameters:
     Type: String
     Default: "arn:aws:codeconnections:eu-west-1:571600846761:connection/c697f9ec-d323-4728-840e-c7ea7a55a351"
     Description: "Hardcoded GitHub Connection ARN - Not recommended."
+
 Resources:
   # DynamoDB Table
   DynamoDBTable:
@@ -434,7 +435,7 @@ Resources:
         IndexDocument: "index.html"
   
   #ContactS3Bucket Policy
-  ContactFormBucketPolicy:
+  ContactS3BucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
       Bucket: !Ref ContactS3Bucket
@@ -686,6 +687,120 @@ Resources:
                   - codepipeline:PutJobFailureResult
                 Resource: "*"
 
+  #CloudFront Distribution & access control
+
+  AccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: "AccessControl"
+        SigningBehavior: "always"
+        SigningProtocol: "sigv4"
+        OriginAccessControlOriginType: "s3"
+
+  # CloudFront Distribution with S3 as origin using OAC
+  CloudFrontDist:
+    Type: AWS::CloudFront::Distribution
+    DependsOn: 
+      - ContactS3Bucket
+      - UploadHtmlCustomResource
+    Properties:
+      DistributionConfig:
+        Origins:
+          - Id: 'S3Origin'
+            DomainName: !GetAtt ContactS3Bucket.DomainName
+            S3OriginConfig: {}
+            OriginAccessControlId: !Ref AccessControl  # Link the OAC here
+        Enabled: true
+        DefaultRootObject: 'index.html'
+        DefaultCacheBehavior:
+          TargetOriginId: 'S3Origin'
+          ViewerProtocolPolicy: 'redirect-to-https'
+          AllowedMethods:
+            - 'GET'
+            - 'HEAD'
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: 'none'
+        PriceClass: 'PriceClass_100'
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+  #CloudFront Lambda Function
+  CloudFrontInvalidationFunction:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - CodePipelineRole
+      - CloudFrontDist
+    Properties:
+      FunctionName: CloudFrontInvalidationFunction
+      Handler: index.lambda_handler
+      Runtime: python3.9
+      Role: !GetAtt CodePipelineRole.Arn
+      Environment:
+        Variables:
+          DISTRIBUTION_ID: !Ref CloudFrontDist
+      Code:
+        ZipFile: |
+          import boto3
+          import os
+
+          cloudfront = boto3.client('cloudfront')
+          codepipeline = boto3.client('codepipeline')
+
+          def lambda_handler(event, context):
+              distribution_id = os.getenv('DISTRIBUTION_ID')
+              
+              # Extract jobId for the CodePipeline action
+              job_id = event['CodePipeline.job']['id']
+              
+              try:
+                  # Create CloudFront invalidation
+                  response = cloudfront.create_invalidation(
+                      DistributionId=distribution_id,
+                      InvalidationBatch={
+                          'Paths': {
+                              'Quantity': 1,
+                              'Items': ['/*']
+                          },
+                          'CallerReference': str(context.aws_request_id)
+                      }
+                  )
+                  
+                  print(f"Invalidation created: {response}")
+                  
+                  # Notify CodePipeline of successful completion
+                  codepipeline.put_job_success_result(jobId=job_id)
+                  
+                  return {
+                      'statusCode': 200,
+                      'body': {
+                          'status': 'Succeeded',
+                          'message': f"Invalidation created with ID: {response['Invalidation']['Id']}"
+                      }
+                  }
+              
+              except Exception as e:
+                  # Notify CodePipeline of failure
+                  print(f"Error: {str(e)}")
+                  codepipeline.put_job_failure_result(
+                      jobId=job_id,
+                      failureDetails={
+                          'message': str(e),
+                          'type': 'JobFailed'
+                      }
+                  )
+                  
+                  return {
+                      'statusCode': 500,
+                      'body': {
+                          'status': 'Failed',
+                          'message': f"Error during invalidation: {str(e)}"
+                      }
+                  }
+
+
   #Skapa Pipeline
   CodePipeline:
     Type: AWS::CodePipeline::Pipeline
@@ -731,6 +846,20 @@ Resources:
               Configuration:
                 BucketName: !Ref ContactS3Bucket
                 Extract: 'true'
+        - Name: InvalidateCache
+          Actions:
+            - Name: CloudFrontInvalidation
+              ActionTypeId:
+                Category: Invoke
+                Owner: AWS
+                Provider: Lambda
+                Version: 1
+              Configuration:
+                FunctionName: !Ref CloudFrontInvalidationFunction
+              RoleArn: !GetAtt CodePipelineRole.Arn  # Use CodePipelineRole here
+              RunOrder: 1
+              OutputArtifacts:  # Add this if you want to pass data between pipeline stages
+                - Name: InvalidationOutput
 
 Outputs:
   WebsiteURL:
