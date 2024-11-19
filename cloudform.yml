@@ -30,11 +30,6 @@ Parameters:
     Default: "mantis417/serverless"
     Description: "GitHub repository"
 
-  GitHubConnectionArn:
-    Type: String
-    Default: "arn:aws:codeconnections:eu-west-1:571600846761:connection/c697f9ec-d323-4728-840e-c7ea7a55a351"
-    Description: "Hardcoded GitHub Connection ARN - Not recommended."
-
 Resources:
   # DynamoDB Table
   DynamoDBTable:
@@ -631,14 +626,19 @@ Resources:
       ApiStage: "default"
 
   #Skapande av CI/CD Pipeline
-
+  #GitHub Connection - Behöver valideras efter cloudformation körts.
+  GitHubConnection:
+    Type: AWS::CodeStarConnections::Connection
+    Properties:
+      ConnectionName: GitHubConnection
+      ProviderType: GitHub
   #Bucket för artifacts för CodePipeline
   ArtifactBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub 'artifact-bucket-${AWS::AccountId}-${AWS::Region}-${AWS::StackName}'
 
-  #IAM Role for CodePipeline
+  #IAM Role for CodePipeline & CloudFront
   CodePipelineRole:
     Type: AWS::IAM::Role
     Properties:
@@ -668,7 +668,14 @@ Resources:
                   - !GetAtt ArtifactBucket.Arn
                   - !Sub "${ArtifactBucket.Arn}/*"
                   - !Sub "${ContactS3Bucket.Arn}/*"
-                  - !Ref GitHubConnectionArn
+                  - !Ref GitHubConnection
+
+              #CloudFront invalidation permissions
+              - Effect: Allow
+                Action:
+                  - cloudfront:CreateInvalidation
+                  - lambda:InvokeFunction
+                Resource: "*"
 
               - Effect: Allow
                 Action:
@@ -698,7 +705,6 @@ Resources:
         SigningProtocol: "sigv4"
         OriginAccessControlOriginType: "s3"
 
-  # CloudFront Distribution with S3 as origin using OAC
   CloudFrontDist:
     Type: AWS::CloudFront::Distribution
     DependsOn: 
@@ -800,7 +806,6 @@ Resources:
                       }
                   }
 
-
   #Skapa Pipeline
   CodePipeline:
     Type: AWS::CodePipeline::Pipeline
@@ -808,6 +813,7 @@ Resources:
       - CodePipelineRole
       - ArtifactBucket
       - ContactS3Bucket
+      - GitHubConnection
     Properties:
       Name: MyPipeline
       RoleArn: !GetAtt CodePipelineRole.Arn
@@ -829,7 +835,7 @@ Resources:
               OutputArtifacts:
                 - Name: SourceOutput
               Configuration:
-                ConnectionArn: !Ref GitHubConnectionArn
+                ConnectionArn: !Ref GitHubConnection
                 FullRepositoryId: !Ref GitHubRepository
                 BranchName: main
 
@@ -856,9 +862,9 @@ Resources:
                 Version: 1
               Configuration:
                 FunctionName: !Ref CloudFrontInvalidationFunction
-              RoleArn: !GetAtt CodePipelineRole.Arn  # Use CodePipelineRole here
+              RoleArn: !GetAtt CodePipelineRole.Arn
               RunOrder: 1
-              OutputArtifacts:  # Add this if you want to pass data between pipeline stages
+              OutputArtifacts:
                 - Name: InvalidationOutput
 
 Outputs:
