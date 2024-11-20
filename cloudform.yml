@@ -288,73 +288,92 @@ Resources:
               ses = boto3.client('ses')
 
               # Build the HTML table body for the email
-            body = """
-            <html>
-            <head>
-                <style>
-                    body {
-                        font-family: Arial, sans-serif;
-                        background-color: #f9f9f9;
-                        color: #333;
-                        margin: 0;
-                        padding: 20px;
-                    }
-                    h3 {
-                        text-align: center;
-                        color: #4a90e2;
-                        font-family: 'Roboto', sans-serif;
-                    }
-                    table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        margin: 20px 0;
-                        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-                        background: linear-gradient(135deg, #ff7e5f, #feb47b);
-                        color: #fff;
-                        border-radius: 10px;
-                        overflow: hidden;
-                    }
-                    th, td {
-                        text-align: left;
-                        padding: 12px;
-                    }
-                    th {
-                        background: #333;
-                        color: #fff;
-                        font-size: 14px;
-                        font-weight: bold;
-                    }
-                    tr:nth-child(even) {
-                        background: rgba(255, 255, 255, 0.1);
-                    }
-                    tr:hover {
-                        background: rgba(255, 255, 255, 0.2);
-                        transition: background 0.3s;
-                    }
-                    td {
-                        font-size: 13px;
-                    }
-                    @media (max-width: 600px) {
-                        table {
-                            font-size: 12px;
-                        }
-                        th, td {
-                            padding: 8px;
-                        }
-                    }
-                </style>
-            </head>
-            <body>
-                <h3>Contact Information</h3>
-                <table>
-                    <tr>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Message</th>
-                        <th>Timestamp</th>
-                    </tr>
-            """
+              body = """
+              <html>
+              <head>
+                  <style>
+                      body {
+                          font-family: Arial, sans-serif;
+                          background-color: #f9f9f9;
+                          color: #333;
+                          margin: 0;
+                          padding: 20px;
+                      }
+                      h3 {
+                          text-align: center;
+                          color: #4a90e2;
+                          font-family: 'Roboto', sans-serif;
+                      }
+                      table {
+                          width: 100%;
+                          border-collapse: collapse;
+                          margin: 20px 0;
+                          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                          background: linear-gradient(135deg, #ff7e5f, #feb47b);
+                          color: #fff;
+                          border-radius: 10px;
+                          overflow: hidden;
+                      }
+                      th, td {
+                          text-align: left;
+                          padding: 12px;
+                      }
+                      th {
+                          background: #333;
+                          color: #fff;
+                          font-size: 14px;
+                          font-weight: bold;
+                      }
+                      tr:nth-child(even) {
+                          background: rgba(255, 255, 255, 0.1);
+                      }
+                      tr:hover {
+                          background: rgba(255, 255, 255, 0.2);
+                          transition: background 0.3s;
+                      }
+                      td {
+                          font-size: 13px;
+                      }
+                      @media (max-width: 600px) {
+                          table {
+                              font-size: 12px;
+                          }
+                          th, td {
+                              padding: 8px;
+                          }
+                      }
+                  </style>
+              </head>
+              <body>
+                  <h3>Contact Information</h3>
+                  <table>
+                      <tr>
+                          <th>Name</th>
+                          <th>Email</th>
+                          <th>Message</th>
+                          <th>Timestamp</th>
+                      </tr>
+              """
 
+              # Add rows to the table with the contact information from DynamoDB
+              for item in items:
+                  body += f"""
+                      <tr>
+                          <td>{item['name']}</td>
+                          <td>{item['email']}</td>
+                          <td>{item['message']}</td>
+                          <td>{item['timestamp']}</td>
+                      </tr>
+                  """
+
+              # Close the HTML tags
+              body += """
+                  </table>
+              </body>
+              </html>
+              """
+
+              # Send the email using SES
               ses.send_email(
                   Source=os.environ['FROM_EMAIL'],
                   Destination={
@@ -380,6 +399,7 @@ Resources:
                   'statusCode': 200,
                   'body': json.dumps('Successfully sent email from Lambda using Amazon SES')
               }
+
 
       Environment:
         Variables:
