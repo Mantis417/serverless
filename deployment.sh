@@ -1,18 +1,14 @@
 #!/bin/bash
 
-# Set variables for the template file and stack name
-TEMPLATE_FILE="cloudform.yml"  # Change this to the path of your CloudFormation template file
-STACK_NAME="serverless1"  # Change this to your stack name
-
-# Deploy the CloudFormation stack using the variables from .env
+# Deploy the CloudFormation
 aws cloudformation deploy \
-  --template-file "$TEMPLATE_FILE" \
-  --stack-name "$STACK_NAME" \
+  --template-file "cloudform.yml" \
+  --stack-name "serverless" \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameter-overrides \
-    GitHubOwner="mantis417" \
-    GitHubRepo="mantis417/serverless" \
-    GitHubBranch="main" \
+    GitHubRepository="mantis417/serverless" \
+    FrMail="christoffer.r.soderstrom@gmail.com" \
+    TillMail="chrisan12345@gmail.com" \
 
 # Check if deployment was successful
 if [ $? -eq 0 ]; then
@@ -22,4 +18,11 @@ else
   exit 1
 fi
 
-echo "This is the contact form URL: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[0].OutputValue" --output text)"
+# Hämta CloudFront Distribution ID (ersätt med din egen distribution ID om du har det)
+DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[0].Id" --output text)
+
+# Hämta CloudFront Distribution DomainName
+CLOUDFRONT_URL=$(aws cloudfront get-distribution --id $DISTRIBUTION_ID --query "Distribution.DomainName" --output text)
+
+# Visa URL
+echo "CloudFront URL: https://$CLOUDFRONT_URL"

@@ -4,31 +4,15 @@ Description: Serverless contactform webapplication
 Parameters:
   FrMail:
     Type: String
-    Default: "christoffer.r.soderstrom@gmail.com"
-    Description: "The email address to send from (must be verified in SES)."
+    Description: "Email sender."
 
   TillMail:
     Type: String
-    Default: "chrisan12345@gmail.com"
-    Description: "The recipient email address (must be verified in SES)."
-
-  GitHubRepo:
-    Type: String
-    Description: "GitHub repository name"
-
-  GitHubOwner:
-    Type: String
-    Description: "GitHub repository owner (e.g., username or organization name)"
-
-  GitHubBranch:
-    Type: String
-    Default: "main"  # Default branch name
-    Description: "GitHub branch name (e.g., 'main')"
+    Description: "Email recipient."
   
   GitHubRepository:
     Type: String
-    Default: "mantis417/serverless"
-    Description: "GitHub repository"
+    Description: "GitHub repository."
 
 Resources:
   # DynamoDB Table
@@ -425,9 +409,7 @@ Resources:
         BlockPublicAcls: false
         IgnorePublicAcls: false
         BlockPublicPolicy: false  
-        RestrictPublicBuckets: false  
-      WebsiteConfiguration:
-        IndexDocument: "index.html"
+        RestrictPublicBuckets: false
   
   #ContactS3Bucket Policy
   ContactS3BucketPolicy:
@@ -716,7 +698,7 @@ Resources:
           - Id: 'S3Origin'
             DomainName: !GetAtt ContactS3Bucket.DomainName
             S3OriginConfig: {}
-            OriginAccessControlId: !Ref AccessControl  # Link the OAC here
+            OriginAccessControlId: !Ref AccessControl
         Enabled: true
         DefaultRootObject: 'index.html'
         DefaultCacheBehavior:
@@ -866,8 +848,3 @@ Resources:
               RunOrder: 1
               OutputArtifacts:
                 - Name: InvalidationOutput
-
-Outputs:
-  WebsiteURL:
-    Description: "URL for the static website"
-    Value: !Sub "http://${ContactS3Bucket}.s3-website-${AWS::Region}.amazonaws.com"
